@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ESP部室予約</title>
+<title>ESP部室予約 v3.1</title>
 <style>
   :root{
     --glass: rgba(255,255,255,.12);
@@ -83,13 +83,14 @@
 
   <!-- ホーム -->
   <section id="home" class="center-wrap" hidden>
-    <h1 class="title">ESP部室予約</h1>
+    <h1 class="title">ESP部室予約サイト</h1>
     <div class="btn-row">
       <button class="btn" id="btnLogin">ログイン</button>
       <button class="btn" id="btnBrowse">閲覧</button>
       <button class="btn" id="btnAdmin">管理</button>
       <button class="btn" id="btnEvents">イベント</button>
       <button class="btn" id="btnHistory">履歴</button>
+      <button class="btn" id="btnRules">ルール</button>
     </div>
   </section>
 
@@ -121,6 +122,18 @@
     </form>
   </dialog>
 
+  <!-- ルール -->
+  <dialog id="dlgRules">
+    <form method="dialog">
+      <h2>予約のルール</h2>
+      <div class="row"><textarea disabled style="background:rgba(255,255,255,.92); color:#0f172a">【予約のルール】
+・バンド練は1日2H、個人練は1日1Hまで！
+・定期ライブ2週間前は出演バンド優先！
+</textarea></div>
+      <div class="modal-actions"><button class="btn" value="close">閉じる</button></div>
+    </form>
+  </dialog>
+
   <!-- 管理パネル -->
   <section id="adminPanel" class="card" hidden style="position:fixed; inset:auto 8px 8px 8px;">
     <h2>管理パネル</h2>
@@ -128,7 +141,7 @@
       <button class="btn small" id="btnAdminNew">新規登録</button>
       <button class="btn small" id="btnAdminList">ユーザー照会</button>
       <button class="btn small" id="btnAdminBoard">予約表管理</button>
-      <button class="btn small ghost" id="btnAdminBack">ホームへ戻る</button>
+      <button class="btn small ghost" id="btnAdminBack">HOME</button>
     </div>
     <!-- 新規登録 -->
     <div id="adminNew" hidden>
@@ -149,7 +162,7 @@
   <section id="booking" hidden>
     <div class="topbar">
       <div class="left">
-        <button class="btn small" id="btnBackOrLogout">戻る</button>
+        <button class="btn small" id="btnBackOrLogout">HOME</button>
         <span class="tag" id="who"></span>
         <span class="tag" id="modeTag"></span>
       </div>
@@ -200,6 +213,26 @@
         <button class="btn" value="band">バンド</button>
       </div>
       <div class="modal-actions"><button class="btn ghost" formnovalidate value="close">閉じる</button></div>
+    </form>
+  </dialog>
+
+  <!-- 個人：楽器選択 -->
+  <dialog id="dlgPersonal">
+    <form method="dialog" id="personalForm">
+      <h2>個人練：楽器を選択</h2>
+      <div class="row" style="display:block">
+        <label style="display:block; margin-bottom:8px">楽器</label>
+        <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px">
+          <label><input type="radio" name="inst" value="Dr"> ドラム</label>
+          <label><input type="radio" name="inst" value="Gt"> ギター</label>
+          <label><input type="radio" name="inst" value="Ba"> ベース</label>
+          <label><input type="radio" name="inst" value="Key"> キーボード</label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" formnovalidate value="close">閉じる</button>
+        <button class="btn" id="btnPersonalConfirm" value="ok" disabled>予約確定</button>
+      </div>
     </form>
   </dialog>
 
@@ -255,11 +288,11 @@ let state = {
   adminOverride: false,       // 予約表管理からの開放フラグ
   pending: null,              // {date, slot}
   today: new Date(),
-  days: [],                   // 14 dates starting today
+  days: [],                   // 14 days from today
   times: [],                  // 9-21 hourly
   bookings: {},               // { dateISO: { slotIdx: {...} } }
   events: {},                 // { dateISO: text }
-  calMonth: null              // {y, m} for events calendar
+  calMonth: null              // {y, m}
 };
 
 function setView(v){
@@ -277,8 +310,10 @@ const btnBrowse = document.getElementById("btnBrowse");
 const btnAdmin = document.getElementById("btnAdmin");
 const btnEvents = document.getElementById("btnEvents");
 const btnHistory = document.getElementById("btnHistory");
+const btnRules = document.getElementById("btnRules");
 const dlgLogin = document.getElementById("dlgLogin");
 const dlgAdminPwd = document.getElementById("dlgAdminPwd");
+const dlgRules = document.getElementById("dlgRules");
 const loginForm = document.getElementById("loginForm");
 const adminPwdForm = document.getElementById("adminPwdForm");
 
@@ -287,6 +322,7 @@ btnBrowse.addEventListener("click", ()=>{ state.currentUser=null; state.mode="vi
 btnAdmin.addEventListener("click", ()=>{ document.getElementById("adminPwdErr").hidden=true; document.getElementById("adminPwd").value=""; dlgAdminPwd.showModal(); });
 btnEvents.addEventListener("click", ()=>{ openEvents(); });
 btnHistory.addEventListener("click", ()=>{ openHistory(); });
+btnRules.addEventListener("click", ()=>{ dlgRules.showModal(); });
 
 loginForm.addEventListener("submit", async (e)=>{
   const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
@@ -316,7 +352,7 @@ const regErr = document.getElementById("regErr");
 
 btnAdminNew.addEventListener("click", ()=> showAdminTab("new"));
 btnAdminList.addEventListener("click", ()=> showAdminTab("list"));
-btnAdminBack.addEventListener("click", ()=> { setView("home"); });
+btnAdminBack.addEventListener("click", ()=> { state.currentUser=null; state.adminOverride=false; setView("home"); });
 btnAdminBoard.addEventListener("click", ()=> { state.mode = "admin"; state.adminOverride=true; state.currentUser = {name:"[管理]"}; goBooking(); });
 
 function openAdmin(){ setView("admin"); showAdminTab("new"); renderUserList(); }
@@ -367,6 +403,9 @@ const modeTag = document.getElementById("modeTag");
 const btnBackOrLogout = document.getElementById("btnBackOrLogout");
 const grid = document.getElementById("grid");
 const dlgChoose = document.getElementById("dlgChoose");
+const dlgPersonal = document.getElementById("dlgPersonal");
+const personalForm = document.getElementById("personalForm");
+const btnPersonalConfirm = document.getElementById("btnPersonalConfirm");
 const dlgBand = document.getElementById("dlgBand");
 const bandForm = document.getElementById("bandForm");
 const bandErr = document.getElementById("bandErr");
@@ -377,9 +416,9 @@ btnBackOrLogout.addEventListener("click", ()=>{ state.currentUser=null; state.ad
 function goBooking(){
   setView("booking");
   who.textContent = state.currentUser ? `ログイン中：${state.currentUser.name}` : "閲覧モード";
-  if(state.mode==="view"){ btnBackOrLogout.textContent = "ホームに戻る"; modeTag.textContent = "閲覧のみ（追加/削除不可）"; }
-  else if(state.mode==="admin"){ btnBackOrLogout.textContent = "HOME"; modeTag.textContent = "管理開放：制限なし"; }
-  else { btnBackOrLogout.textContent = "HOME"; modeTag.textContent = "予約可"; }
+  if(state.mode==="view"){ modeTag.textContent = "閲覧のみ（追加/削除不可）"; }
+  else if(state.mode==="admin"){ modeTag.textContent = "管理開放：制限なし"; }
+  else { modeTag.textContent = "予約可"; }
   buildCalendar();
   startMidnightWatcher();
   subscribeRealtime();
@@ -409,6 +448,9 @@ async function loadEventsRange(){
   const map={}; for(const r of data){ map[r.d]=r.text||""; } return map;
 }
 
+function isPast(iso){ const d=new Date(iso); return d < state.today; }
+function canEdit(iso){ return state.adminOverride || !isPast(iso); }
+
 function renderGrid(){
   grid.innerHTML = "";
   // ヘッダ
@@ -418,8 +460,9 @@ function renderGrid(){
   state.days.forEach(d=>{
     const ds = dateToLocalISO(d);
     const dv = document.createElement("div"); dv.className = (ds===todayStr)?"today":"";
+    const mdColor = d.getDay()===0 ? '#ef4444' : (d.getDay()===6 ? '#3b82f6' : '#ffffff');
     const md = `${d.getMonth()+1}/${d.getDate()}(${dayNames[d.getDay()]})`;
-    dv.innerHTML = `<div><div style=\"font-size:12px;opacity:.85\">${md}</div><div style=\"font-size:10px;opacity:.7\">${ds}</div></div>`;
+    dv.innerHTML = `<div><div class=\"date-title\" style=\"font-size:12px;opacity:.95;color:${mdColor}\">${md}</div><div style=\"font-size:10px;opacity:.7\">${ds}</div></div>`;
     head.appendChild(dv);
   });
   grid.appendChild(head);
@@ -436,10 +479,16 @@ function renderGrid(){
         cell.style.background = slotObj.color || "rgba(255,255,255,.08)";
         cell.innerHTML = `<div class=\"badge\">${escapeHTML(slotObj.label)}</div>`;
         if(state.adminOverride){ cell.addEventListener("click", ()=> onCellAdminClick(dISO, r)); }
-        else if(state.currentUser && slotObj.by === state.currentUser.name){ cell.classList.add("mine"); cell.addEventListener("click", ()=> onCellMineClick(dISO, r)); }
+        else if(state.currentUser && slotObj.by === state.currentUser.name){
+          if(canEdit(dISO)) { cell.classList.add("mine"); cell.addEventListener("click", ()=> onCellMineClick(dISO, r)); }
+        }
       }else{
-        cell.classList.add("empty");
-        if(state.mode!=="view"){ cell.addEventListener("click", ()=> onEmptyCellClick(dISO, r)); }
+        if(state.mode!=="view" && canEdit(dISO)){
+          cell.classList.add("empty");
+          cell.addEventListener("click", ()=> onEmptyCellClick(dISO, r));
+        } else {
+          cell.style.cursor = "default";
+        }
       }
       row.appendChild(cell);
     }
@@ -459,17 +508,37 @@ function renderGrid(){
   grid.appendChild(erow);
 }
 
-function onEmptyCellClick(date, slot){ state.pending={date, slot}; dlgChoose.returnValue=""; dlgChoose.showModal(); dlgChoose.addEventListener("close", ()=>{ const v=dlgChoose.returnValue; if(v==="personal") doPersonal(); else if(v==="band") openBandDialog(); }, {once:true}); }
+function onEmptyCellClick(date, slot){ state.pending={date, slot}; dlgChoose.returnValue=""; dlgChoose.showModal(); dlgChoose.addEventListener("close", ()=>{ const v=dlgChoose.returnValue; if(v==="personal") openPersonalDialog(); else if(v==="band") openBandDialog(); }, {once:true}); }
 
-async function doPersonal(){
+function openPersonalDialog(){
+  // 初期化
+  btnPersonalConfirm.disabled = true;
+  [...personalForm.querySelectorAll('input[name="inst"]')].forEach(r=> r.checked=false);
+  dlgPersonal.returnValue=""; dlgPersonal.showModal();
+  // ラジオ選択で有効化
+  personalForm.addEventListener('change', ()=>{
+    const val = personalForm.querySelector('input[name="inst"]:checked');
+    btnPersonalConfirm.disabled = !val;
+  }, {once:false});
+  // 送信
+  personalForm.addEventListener('submit', async (e)=>{
+    const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
+    const picked = personalForm.querySelector('input[name="inst"]:checked')?.value;
+    if(!picked){ return; }
+    await doPersonal(picked);
+  }, {once:true});
+}
+
+async function doPersonal(instAbbr){
   const name = state.currentUser?.name || "匿名";
   if(!state.adminOverride){
     const used = await countMyHours(state.pending.date, name, 'personal');
     if(used>=1){ alert("個人予約は1日1時間までです。"); return; }
   }
+  const label = `${name} ${instAbbr}`; // 例：山田太郎 Gt
   try{
-    await insertBooking({ d:state.pending.date, slot:state.pending.slot, type:'personal', label:name, color:'rgba(255,255,255,.10)', dur:1, owner:name });
-    if(dlgChoose.open) dlgChoose.close();
+    await insertBooking({ d:state.pending.date, slot:state.pending.slot, type:'personal', label, color:'rgba(255,255,255,.10)', dur:1, owner:name });
+    if(dlgPersonal.open) dlgPersonal.close(); if(dlgChoose.open) dlgChoose.close();
   }catch(e){ alert(e.message); }
 }
 
@@ -489,7 +558,6 @@ async function doBand(label, dur){
       const occupied = await isOccupied(date, slot) || await isOccupied(date, slot+1);
       if(occupied && !state.adminOverride){ alert("連続2枠のどちらかが埋まっています。"); return; }
       if(occupied && state.adminOverride){
-        // 上書き：既存を消してから入れる
         await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]);
       }
       await insertBooking({ d:date, slot:slot,   type:'band', label, color, dur:2, owner:name });
@@ -504,14 +572,9 @@ async function doBand(label, dur){
   }catch(e){ alert(e.message); }
 }
 
-async function onCellMineClick(date, slot){ state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; const cell = state.bookings[date]?.[slot]; if(!cell) return; const owner = state.currentUser?.name; if(!owner) return; await deleteCascade(date, slot, owner); }, {once:true}); }
+async function onCellMineClick(date, slot){ if(!canEdit(date)) return; state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; const cell = state.bookings[date]?.[slot]; if(!cell) return; const owner = state.currentUser?.name; if(!owner) return; await deleteCascade(date, slot, owner); }, {once:true}); }
 
-async function onCellAdminClick(date, slot){ state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; // 所有者に関係なく削除
-  const cell = state.bookings[date]?.[slot]; if(!cell){ return; }
-  if(cell.dur===2){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]); }
-  else if(cell.dur===0){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot-1, slot]); }
-  else { await sb.from('bookings').delete().eq('d', date).eq('slot', slot); }
-}, {once:true}); }
+async function onCellAdminClick(date, slot){ state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; const cell = state.bookings[date]?.[slot]; if(!cell){ return; } if(cell.dur===2){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]); } else if(cell.dur===0){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot-1, slot]); } else { await sb.from('bookings').delete().eq('d', date).eq('slot', slot); } }, {once:true}); }
 
 async function deleteCascade(date, slot, owner){
   const cell = state.bookings[date]?.[slot]; if(!cell) return;
@@ -529,7 +592,7 @@ async function isOccupied(d, slot){ const { data } = await sb.from('bookings').s
 // ===== Realtime =====
 let realtimeSub = null;
 function subscribeRealtime(){
-  if(realtimeSub){ sb.removeChannel(realtimeSub); realtimeSub=null; }
+  if(realtimeSub){ try{ sb.removeChannel(realtimeSub); }catch(_){} realtimeSub=null; }
   realtimeSub = sb.channel('esp-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async ()=>{ const map = await loadBookingsRange(); state.bookings = map; renderGrid(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, async ()=>{ const emap = await loadEventsRange(); state.events = emap; renderGrid(); })
@@ -538,7 +601,7 @@ function subscribeRealtime(){
 
 // ===== 0時の自動切替 =====
 let midnightTimer=null;
-function startMidnightWatcher(){ if(midnightTimer) clearInterval(midnightTimer); midnightTimer = setInterval(()=>{ const now=new Date(); now.setHours(0,0,0,0); if(now.getTime()!==state.today.getTime()){ buildCalendar(); } }, 30000); }
+function startMidnightWatcher(){ if(midnightTimer) clearInterval(midnightTimer); midnightTimer = setInterval(()=>{ const now=new Date(); now.setHours(0,0,0,0); if(now.getTime()!==state.today.getTime()){ buildCalendar(); } }, 120000); }
 
 // ===== イベントカレンダー =====
 const calendarEl = document.getElementById('calendar');
@@ -562,11 +625,9 @@ function renderCalendar(){
   calendarHead.textContent = `${y}年 ${m+1}月`;
   calendarEl.innerHTML = '';
 
-  // 曜日ヘッダ
   const wnames = ['日','月','火','水','木','金','土'];
   for(const w of wnames){ const h=document.createElement('div'); h.textContent=w; h.style.textAlign='center'; h.style.opacity=.9; h.style.fontWeight='700'; h.style.textShadow='0 1px 2px rgba(0,0,0,.6)'; calendarEl.appendChild(h); }
 
-  // グリッド（6週分）
   const cells = firstDow + daysInMonth; const total = Math.ceil(cells/7)*7;
   for(let i=0;i<total;i++){
     const cell = document.createElement('div'); cell.style.minHeight='80px'; cell.style.padding='8px'; cell.style.border='1px solid var(--border)'; cell.style.borderRadius='12px'; cell.style.background='var(--glass)'; cell.style.backdropFilter='blur(6px)'; cell.style.boxShadow='var(--shadow)'; cell.style.whiteSpace='pre-wrap'; cell.style.textShadow='0 1px 2px rgba(0,0,0,.7)';
@@ -575,6 +636,8 @@ function renderCalendar(){
       const d = new Date(y, m, day); const iso = dateToLocalISO(d);
       const title = document.createElement('div'); title.textContent = `${day}`; title.style.fontWeight='800'; title.style.marginBottom='6px';
       const body = document.createElement('div'); body.style.fontSize='12px'; body.style.opacity=.95; body.textContent = state.events[iso] || '';
+      if(d.getDay()===0){ title.style.color = '#ef4444'; }
+      if(d.getDay()===6){ title.style.color = '#3b82f6'; }
       cell.appendChild(title); cell.appendChild(body);
       cell.addEventListener('click', async ()=>{
         eventDateLabel.textContent = `イベント：${iso}`;
@@ -585,7 +648,8 @@ function renderCalendar(){
           const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
           const text = eventTextEl.value;
           const { error } = await sb.from('events').upsert({ d: iso, text }, { onConflict: 'd' });
-          if(error) alert('保存失敗: '+error.message);
+          if(error){ alert('保存失敗: '+error.message); return; }
+          state.events[iso] = text; renderCalendar();
         }, {once:true});
       });
     }
@@ -599,7 +663,7 @@ document.getElementById('btnNextMonth').addEventListener('click', ()=>{ state.ca
 
 document.getElementById('btnThisMonth').addEventListener('click', ()=>{ const t=new Date(); state.calMonth={y:t.getFullYear(), m:t.getMonth()}; renderCalendar(); });
 
-document.getElementById('btnEventsHome').addEventListener('click', ()=> setView('home'));
+document.getElementById('btnEventsHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 履歴 =====
 function openHistory(){ setView('history'); renderHistory(); }
@@ -609,7 +673,7 @@ async function renderHistory(){
   if(error){ list.innerHTML = `<div class="hint">読み込みエラー: ${escapeHTML(error.message)}</div>`; return; }
   const rows = data.map(r=>{
     const hour = 9 + r.slot; const range = `${hour}:00-${hour+1}:00`;
-    const t = new Date(r.created_at).toLocaleString();
+    const t = new Date(r.created_at).toLocaleString('ja-JP', { hour12:false });
     return `<div class=\"card\" style=\"padding:10px; margin:8px 0\">`+
       `<div><b>${escapeHTML(r.d)}</b> ${escapeHTML(range)} / ${escapeHTML(r.type)} / ${escapeHTML(r.label)} <span class=\"hint\">by ${escapeHTML(r.owner)}</span></div>`+
       `<div class=\"hint\">作成: ${escapeHTML(t)}</div>`+
@@ -618,7 +682,7 @@ async function renderHistory(){
   list.innerHTML = rows || `<div class="hint">まだ履歴がありません。</div>`;
 }
 
-document.getElementById('btnHistoryHome').addEventListener('click', ()=> setView('home'));
+document.getElementById('btnHistoryHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 初期化 =====
 function init(){ setView("home"); document.getElementById("home").hidden=false; }
