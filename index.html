@@ -84,16 +84,18 @@
       <button class="btn" id="btnBrowse">閲覧</button>
       <button class="btn" id="btnAdmin">管理</button>
     </div>
+    <div class="hint">※ 背景画像は <code>BG.jpg</code> を同フォルダに置いてください</div>
   </section>
 
+  <!-- ログイン モーダル（閉じるは常に有効） -->
   <dialog id="dlgLogin">
     <form method="dialog" id="loginForm">
       <h2>ログイン</h2>
-      <div class="row"><label>漢字フルネーム</label><input id="loginName" required placeholder="山田太郎" /></div>
+      <div class="row"><label>漢字フルネーム</label><input id="loginName" placeholder="山田太郎" required /></div>
       <div class="row"><label>パスワード</label><input id="loginPass" type="password" required /></div>
       <div class="error" id="loginErr" hidden>名前またはパスワードが違います。</div>
       <div class="modal-actions">
-        <button class="btn ghost" value="close">閉じる</button>
+        <button class="btn ghost" formnovalidate value="close">閉じる</button>
         <button class="btn" value="ok">ログイン</button>
       </div>
     </form>
