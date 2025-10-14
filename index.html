@@ -84,7 +84,6 @@
       <button class="btn" id="btnBrowse">閲覧</button>
       <button class="btn" id="btnAdmin">管理</button>
     </div>
-    <div class="hint">※ 背景画像は <code>BG.jpg</code> を同フォルダに置いてください</div>
   </section>
 
   <!-- ログイン モーダル（閉じるは常に有効） -->
@@ -93,6 +92,8 @@
       <h2>ログイン</h2>
       <div class="row"><label>漢字フルネーム</label><input id="loginName" placeholder="山田太郎" required /></div>
       <div class="row"><label>パスワード</label><input id="loginPass" type="password" required /></div>
+      <div class="hint">※ 新規登録をご希望の際は幹部に連絡ください。</div>
+
       <div class="error" id="loginErr" hidden>名前またはパスワードが違います。</div>
       <div class="modal-actions">
         <button class="btn ghost" formnovalidate value="close">閉じる</button>
@@ -107,7 +108,7 @@
       <div class="row"><label>パスワード</label><input id="adminPwd" type="password" required placeholder="管理パスワード" /></div>
       <div class="error" id="adminPwdErr" hidden>パスワードが違います。</div>
       <div class="modal-actions">
-        <button class="btn ghost" value="close">閉じる</button>
+        <button class="btn ghost" formnovalidate value="close">閉じる</button>
         <button class="btn" value="ok">認証</button>
       </div>
     </form>
@@ -165,7 +166,7 @@
       <div class="row"><label>バンド名</label><input id="bandName" required placeholder="例）ESP Combo" /></div>
       <div class="row"><label>時間</label><select id="bandDur"><option value="1">1時間</option><option value="2">2時間</option></select></div>
       <div class="error" id="bandErr" hidden></div>
-      <div class="modal-actions"><button class="btn ghost" value="close">閉じる</button><button class="btn" value="ok">予約する</button></div>
+      <div class="modal-actions"><button class="btn ghost" formnovalidate value="close">閉じる</button><button class="btn" value="ok">予約する</button></div>
     </form>
   </dialog>
 
