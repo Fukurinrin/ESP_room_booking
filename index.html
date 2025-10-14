@@ -83,7 +83,7 @@
 
   <!-- ホーム -->
   <section id="home" class="center-wrap" hidden>
-    <h1 class="title">ESP部室予約サイト</h1>
+    <h1 class="title">ESP部室予約</h1>
     <div class="btn-row">
       <button class="btn" id="btnLogin">ログイン</button>
       <button class="btn" id="btnBrowse">閲覧</button>
@@ -415,10 +415,20 @@ btnBackOrLogout.addEventListener("click", ()=>{ state.currentUser=null; state.ad
 
 function goBooking(){
   setView("booking");
-  who.textContent = state.currentUser ? `ログイン中：${state.currentUser.name}` : "閲覧モード";
-  if(state.mode==="view"){ modeTag.textContent = "閲覧のみ（追加/削除不可）"; }
-  else if(state.mode==="admin"){ modeTag.textContent = "管理開放：制限なし"; }
-  else { modeTag.textContent = "予約可"; }
+  who.textContent = state.currentUser ? `${state.currentUser.name}` : "閲覧";
+
+  // ここで「予約可」を非表示（編集モード）
+  if(state.mode==="view"){
+    modeTag.textContent = "閲覧のみ";
+    modeTag.hidden = false;
+  } else if(state.mode==="admin"){
+    modeTag.textContent = "管理開放";
+    modeTag.hidden = false;
+  } else {
+    modeTag.textContent = "";
+    modeTag.hidden = true; // 編集モードは非表示
+  }
+
   buildCalendar();
   startMidnightWatcher();
   subscribeRealtime();
@@ -462,7 +472,7 @@ function renderGrid(){
     const dv = document.createElement("div"); dv.className = (ds===todayStr)?"today":"";
     const mdColor = d.getDay()===0 ? '#ef4444' : (d.getDay()===6 ? '#3b82f6' : '#ffffff');
     const md = `${d.getMonth()+1}/${d.getDate()}(${dayNames[d.getDay()]})`;
-    dv.innerHTML = `<div><div class=\"date-title\" style=\"font-size:12px;opacity:.95;color:${mdColor}\">${md}</div><div style=\"font-size:10px;opacity:.7\">${ds}</div></div>`;
+    dv.innerHTML = `<div><div class="date-title" style="font-size:12px;opacity:.95;color:${mdColor}">${md}</div><div style="font-size:10px;opacity:.7">${ds}</div></div>`;
     head.appendChild(dv);
   });
   grid.appendChild(head);
@@ -477,7 +487,7 @@ function renderGrid(){
       const slotObj = state.bookings[dISO]?.[r];
       if(slotObj){
         cell.style.background = slotObj.color || "rgba(255,255,255,.08)";
-        cell.innerHTML = `<div class=\"badge\">${escapeHTML(slotObj.label)}</div>`;
+        cell.innerHTML = `<div class="badge">${escapeHTML(slotObj.label)}</div>`;
         if(state.adminOverride){ cell.addEventListener("click", ()=> onCellAdminClick(dISO, r)); }
         else if(state.currentUser && slotObj.by === state.currentUser.name){
           if(canEdit(dISO)) { cell.classList.add("mine"); cell.addEventListener("click", ()=> onCellMineClick(dISO, r)); }
@@ -502,7 +512,7 @@ function renderGrid(){
     const dISO = dateToLocalISO(state.days[c]);
     const cell = document.createElement("div"); cell.className = "cell"; cell.dataset.date = dISO; cell.style.opacity=.95;
     const txt = state.events[dISO] || "";
-    cell.innerHTML = `<div class=\"badge\" style=\"white-space:pre-wrap; line-height:1.2\">${escapeHTML(txt)}</div>`;
+    cell.innerHTML = `<div class="badge" style="white-space:pre-wrap; line-height:1.2">${escapeHTML(txt)}</div>`;
     erow.appendChild(cell);
   }
   grid.appendChild(erow);
@@ -674,9 +684,9 @@ async function renderHistory(){
   const rows = data.map(r=>{
     const hour = 9 + r.slot; const range = `${hour}:00-${hour+1}:00`;
     const t = new Date(r.created_at).toLocaleString('ja-JP', { hour12:false });
-    return `<div class=\"card\" style=\"padding:10px; margin:8px 0\">`+
-      `<div><b>${escapeHTML(r.d)}</b> ${escapeHTML(range)} / ${escapeHTML(r.type)} / ${escapeHTML(r.label)} <span class=\"hint\">by ${escapeHTML(r.owner)}</span></div>`+
-      `<div class=\"hint\">作成: ${escapeHTML(t)}</div>`+
+    return `<div class="card" style="padding:10px; margin:8px 0">`+
+      `<div><b>${escapeHTML(r.d)}</b> ${escapeHTML(range)} / ${escapeHTML(r.type)} / ${escapeHTML(r.label)} <span class="hint">by ${escapeHTML(r.owner)}</span></div>`+
+      `<div class="hint">作成: ${escapeHTML(t)}</div>`+
     `</div>`;
   }).join('');
   list.innerHTML = rows || `<div class="hint">まだ履歴がありません。</div>`;
