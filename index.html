@@ -378,8 +378,8 @@ function goBooking(){
   setView("booking");
   who.textContent = state.currentUser ? `ログイン中：${state.currentUser.name}` : "閲覧モード";
   if(state.mode==="view"){ btnBackOrLogout.textContent = "ホームに戻る"; modeTag.textContent = "閲覧のみ（追加/削除不可）"; }
-  else if(state.mode==="admin"){ btnBackOrLogout.textContent = "ログアウトして戻る"; modeTag.textContent = "管理開放：制限なし"; }
-  else { btnBackOrLogout.textContent = "ログアウトして戻る"; modeTag.textContent = "予約可"; }
+  else if(state.mode==="admin"){ btnBackOrLogout.textContent = "HOME"; modeTag.textContent = "管理開放：制限なし"; }
+  else { btnBackOrLogout.textContent = "HOME"; modeTag.textContent = "予約可"; }
   buildCalendar();
   startMidnightWatcher();
   subscribeRealtime();
