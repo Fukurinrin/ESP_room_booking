@@ -42,12 +42,6 @@
   .btn:active{ transform:translateY(2px); box-shadow: inset 0 -0px 0 rgba(0,0,0,.08), 0 6px 12px rgba(0,0,0,.22); filter:brightness(.96); }
   .btn.ghost{ background:transparent; color:#fff; border:1px solid var(--border); box-shadow:none; }
   .btn.small{ padding:10px 14px; min-width:unset; font-weight:600 }
-
-  /* 追加: ホームの横長＆太字ボタン用 */
-  .btn.wide{ width:100%; min-width:unset; padding:16px 26px; font-size:18px; }
-  .btn.strong{ font-weight:800; }
-  .btn-col{ display:flex; flex-direction:column; gap:14px; width:100%; max-width:720px; }
-
   .card{ width:min(100%,720px); background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; backdrop-filter: blur(10px); }
   .card h2{ margin:6px 0 10px; font-size:20px }
   .row{ display:flex; gap:10px; margin:10px 0; align-items:center }
@@ -89,22 +83,14 @@
 
   <!-- ホーム -->
   <section id="home" class="center-wrap" hidden>
-    <h1 class="title">ESP部室予約サイト</h1>
-
-    <!-- ご指定の並び -->
-    <div class="btn-col">
-      <button class="btn wide strong" id="btnLogin">ログイン</button>
-      <button class="btn wide strong" id="btnBrowse">閲覧</button>
-
-      <div class="btn-row">
-        <button class="btn" id="btnEvents">イベント</button>
-        <button class="btn" id="btnRules">ルール</button>
-      </div>
-
-      <div class="btn-row">
-        <button class="btn" id="btnHistory">履歴</button>
-        <button class="btn" id="btnAdmin">管理</button>
-      </div>
+    <h1 class="title">ESP部室予約</h1>
+    <div class="btn-row">
+      <button class="btn" id="btnLogin">ログイン</button>
+      <button class="btn" id="btnBrowse">閲覧</button>
+      <button class="btn" id="btnAdmin">管理</button>
+      <button class="btn" id="btnEvents">イベント</button>
+      <button class="btn" id="btnHistory">履歴</button>
+      <button class="btn" id="btnRules">ルール</button>
     </div>
   </section>
 
@@ -431,7 +417,7 @@ function goBooking(){
   setView("booking");
   who.textContent = state.currentUser ? `${state.currentUser.name}` : "閲覧";
 
-  // 編集モードは「予約可」タグを非表示、閲覧と管理は表示
+  // ここで「予約可」を非表示（編集モード）
   if(state.mode==="view"){
     modeTag.textContent = "閲覧のみ";
     modeTag.hidden = false;
@@ -682,8 +668,11 @@ function renderCalendar(){
 }
 
 document.getElementById('btnPrevMonth').addEventListener('click', ()=>{ state.calMonth.m--; if(state.calMonth.m<0){ state.calMonth.m=11; state.calMonth.y--; } renderCalendar(); });
+
 document.getElementById('btnNextMonth').addEventListener('click', ()=>{ state.calMonth.m++; if(state.calMonth.m>11){ state.calMonth.m=0; state.calMonth.y++; } renderCalendar(); });
+
 document.getElementById('btnThisMonth').addEventListener('click', ()=>{ const t=new Date(); state.calMonth={y:t.getFullYear(), m:t.getMonth()}; renderCalendar(); });
+
 document.getElementById('btnEventsHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 履歴 =====
@@ -702,6 +691,7 @@ async function renderHistory(){
   }).join('');
   list.innerHTML = rows || `<div class="hint">まだ履歴がありません。</div>`;
 }
+
 document.getElementById('btnHistoryHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 初期化 =====
