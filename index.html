@@ -54,8 +54,8 @@
   .error{ color:#fecaca; font-size:13px; margin-top:4px }
   .topbar{ position:fixed; left:8px; right:8px; top:8px; z-index:10; display:flex; gap:8px; align-items:center; justify-content:space-between; }
   .topbar .left, .topbar .right{ display:flex; gap:8px; align-items:center }
-  .tag{ padding:6px 10px; border-radius:999px; background:var(--glass); border:1px solid var(--border); font-size:12px }
-  .grid-wrap{ position:absolute; inset:60px 8px 8px 8px; background:var(--glass); border:1px solid var(--border); border-radius:var(--radius); backdrop-filter: blur(6px); overflow:auto; box-shadow:var(--shadow); }
+  .tag{ padding:6px 10px; border-radius:999px; background: rgba(0,0,0,.55); border:1px solid var(--border); font-size:12px }
+  .grid-wrap{ position:absolute; inset:60px 8px 8px 8px; background: rgba(0,0,0,.55); border:1px solid var(--border); border-radius:var(--radius); backdrop-filter: blur(6px); overflow:auto; box-shadow:var(--shadow); }
   .schedule{ position:relative; min-width: calc(var(--timeW) + 14 * var(--cellW)); }
   .header{ position:sticky; top:0; display:grid; grid-template-columns: var(--timeW) repeat(14, var(--cellW)); height:var(--headH); z-index:2; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
   .header > div{ display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; font-size:13px; padding:6px; border-right:1px solid var(--border); text-shadow: 0 1px 2px rgba(0,0,0,.65); }
