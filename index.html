@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ESP部室予約 v3.3</title>
+<title>ESP部室予約 v3.4</title>
 <style>
   :root{
     --glass: rgba(255,255,255,.12);
@@ -55,20 +55,17 @@
   .btn.small{ padding:10px 14px; min-width:unset; font-weight:600 }
   .btn.wide{ width:100%; justify-self:stretch; }
 
-  /* 右上ハンバーガー */
+  /* 右上ハンバーガー（3本線の長さを統一） */
   .hamburger{
     position:fixed; right:12px; top:12px; z-index:20;
     width:44px; height:44px; border-radius:12px; border:1px solid var(--border);
-    background:rgba(0,0,0,.35); color:#fff; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.35); color:#fff; display:grid; place-items:center;
     box-shadow:var(--shadow); cursor:pointer;
   }
-  .hamburger .bars{ width:20px; height:14px; position:relative; }
-  .hamburger .bars::before, .hamburger .bars::after, .hamburger .bar{
-    content:""; position:absolute; left:0; right:0; height:2px; background:#fff; border-radius:2px;
+  .hamburger .stack{ display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .hamburger .line{
+    width:22px; height:2px; background:#fff; border-radius:2px;
   }
-  .hamburger .bars::before{ top:0; }
-  .hamburger .bar{ top:6px; }
-  .hamburger .bars::after{ bottom:0; }
 
   /* 右スライドドロワー */
   .drawer{
@@ -136,14 +133,21 @@
   <div class="bg"></div>
   <div id="xfade"></div>
 
-  <!-- 右上ハンバーガー（ホームのみ想定） -->
+  <!-- 右上ハンバーガー -->
   <button class="hamburger" id="btnHamburger" aria-label="menu">
-    <div class="bars"></div><div class="bar"></div>
+    <div class="stack">
+      <div class="line"></div>
+      <div class="line"></div>
+      <div class="line"></div>
+    </div>
   </button>
+
+  <!-- 右スライドドロワー -->
   <aside class="drawer" id="drawer">
     <h3>メニュー</h3>
     <div class="drawer-item" id="navEvents">イベント</div>
     <div class="drawer-item" id="navRules">ルール</div>
+    <div class="drawer-item" id="navArchive">過去予約</div>
     <div class="drawer-item" id="navHistory">履歴</div>
     <div class="drawer-item" id="navAdmin">管理</div>
   </aside>
@@ -157,30 +161,30 @@
     </div>
   </section>
 
-  <!-- ログイン -->
+  <!-- ログイン（method="dialog" をやめる：FaceID等で勝手に閉じない） -->
   <dialog id="dlgLogin">
-    <form method="dialog" id="loginForm">
+    <form id="loginForm" autocomplete="on">
       <h2>ログイン</h2>
-      <div class="row"><label>漢字フルネーム</label><input id="loginName" required placeholder="山田太郎" /></div>
-      <div class="row"><label>パスワード</label><input id="loginPass" type="password" required /></div>
+      <div class="row"><label>漢字フルネーム</label><input id="loginName" name="username" required placeholder="山田太郎" /></div>
+      <div class="row"><label>パスワード</label><input id="loginPass" name="password" type="password" required /></div>
       <div class="hint">※ 新規登録をご希望の方は幹部までご連絡ください。</div>
       <div class="error" id="loginErr" hidden>名前またはパスワードが違います。</div>
       <div class="modal-actions">
-        <button class="btn ghost" formnovalidate value="close">閉じる</button>
-        <button class="btn" value="ok">ログイン</button>
+        <button type="button" class="btn ghost" id="btnLoginClose">閉じる</button>
+        <button type="submit" class="btn">ログイン</button>
       </div>
     </form>
   </dialog>
 
-  <!-- 管理パスワード -->
+  <!-- 管理パスワード（同上：勝手に閉じない） -->
   <dialog id="dlgAdminPwd">
-    <form method="dialog" id="adminPwdForm">
+    <form id="adminPwdForm" autocomplete="on">
       <h2>管理</h2>
       <div class="row"><label>パスワード</label><input id="adminPwd" type="password" required placeholder="管理パスワード" /></div>
       <div class="error" id="adminPwdErr" hidden>パスワードが違います。</div>
       <div class="modal-actions">
-        <button class="btn ghost" formnovalidate value="close">閉じる</button>
-        <button class="btn" value="ok">認証</button>
+        <button type="button" class="btn ghost" id="btnAdminPwdClose">閉じる</button>
+        <button type="submit" class="btn">認証</button>
       </div>
     </form>
   </dialog>
@@ -220,7 +224,7 @@
     <div id="adminList" hidden>
       <div id="userList"></div>
     </div>
-    <!-- 制限設定（v3.2 から継承） -->
+    <!-- 制限設定（既存） -->
     <div id="adminLimits" hidden>
       <div class="card" style="padding:12px">
         <div class="row"><label>個人1日1時間</label>
@@ -291,6 +295,17 @@
       </div>
     </div>
     <div id="historyList" style="margin-top:54px"></div>
+  </section>
+
+  <!-- 過去予約（2週間分・閲覧専用） -->
+  <section id="archive" hidden>
+    <div class="topbar">
+      <div class="left">
+        <button class="btn small" id="btnArchiveHome">HOME</button>
+        <span class="tag">過去2週間の予約表（22:00時点スナップショット）</span>
+      </div>
+    </div>
+    <div class="grid-wrap"><div class="schedule" id="archiveGrid"></div></div>
   </section>
 
   <!-- 予約方式選択 -->
@@ -402,9 +417,61 @@ async function saveSettings(){
   if(error) throw new Error(error.message);
 }
 
+// ===== スナップショット（22:00保存／過去2週間表示） =====
+const SNAPSHOT_HOUR = 22; // 22:00
+async function ensureSnapshotFor(iso){
+  // 既にある？
+  const { data:exist } = await sb.from('snapshots').select('d').eq('d', iso).maybeSingle();
+  if(exist) return;
+  // その日の全予約を取得
+  const { data, error } = await sb.from('bookings').select('*').eq('d', iso);
+  if(error) return;
+  // 14スロット分を詰める
+  const slots = Array.from({length:12}, (_,i)=>null); // 9-21 → 12コマ
+  data.forEach(r=>{
+    slots[r.slot] = { type:r.type, label:r.label, color:r.color, by:r.owner, dur:r.dur };
+  });
+  await sb.from('snapshots').upsert({ d: iso, data: slots }, { onConflict:'d' });
+}
+
+function shouldTakeSnapshotNow(){
+  const now = new Date();
+  return now.getHours() >= SNAPSHOT_HOUR;
+}
+
+async function snapshotWatcherTick(){
+  const todayIso = dateToLocalISO(new Date());
+  if(shouldTakeSnapshotNow()){
+    await ensureSnapshotFor(todayIso);
+  }
+}
+
+async function openArchive(){
+  setView('archive');
+  // 未保存なら当日分を補完
+  await snapshotWatcherTick();
+  // 2週間分ロード
+  const end = new Date(); end.setHours(0,0,0,0);
+  const start = addDays(end, -13);
+  const startISO = dateToLocalISO(start);
+  const endISO   = dateToLocalISO(end);
+  const { data } = await sb.from('snapshots').select('*').gte('d', startISO).lte('d', endISO).order('d');
+  // 不足日があれば（過去日でも）一応補完トライ
+  const needMap = new Map();
+  for(let i=0;i<14;i++){ needMap.set(dateToLocalISO(addDays(start,i)), true); }
+  if(data){ for(const r of data){ needMap.delete(r.d); } }
+  for(const iso of needMap.keys()){
+    // 22:00以降で未保存のときのみ補完（当時の状態を完全再現はできないが、残っていれば残存データで）
+    await ensureSnapshotFor(iso);
+  }
+  // 再取得
+  const { data:rows } = await sb.from('snapshots').select('*').gte('d', startISO).lte('d', endISO).order('d');
+  renderArchiveGrid(rows || []);
+}
+
 // ===== 状態 =====
 let state = {
-  view: "home",              // home | booking | admin | events | history
+  view: "home",              // home | booking | admin | events | history | archive
   currentUser: null,          // {name}
   mode: "view",               // view | edit | admin
   adminOverride: false,       // 予約表管理からの開放フラグ
@@ -428,6 +495,7 @@ function setView(v){
     document.getElementById("adminPanel").hidden = v!=="admin";
     document.getElementById("events").hidden = v!=="events";
     document.getElementById("history").hidden = v!=="history";
+    document.getElementById("archive").hidden = v!=="archive";
     setTimeout(()=> xfade.classList.remove('on'), 120);
   }, 120);
 }
@@ -443,6 +511,7 @@ document.addEventListener('click', (e)=>{
 });
 document.getElementById('navEvents').addEventListener('click', ()=>{ drawer.classList.remove('open'); openEvents(); });
 document.getElementById('navRules').addEventListener('click', ()=>{ drawer.classList.remove('open'); dlgRules.showModal(); });
+document.getElementById('navArchive').addEventListener('click', ()=>{ drawer.classList.remove('open'); openArchive(); });
 document.getElementById('navHistory').addEventListener('click', ()=>{ drawer.classList.remove('open'); openHistory(); });
 document.getElementById('navAdmin').addEventListener('click', ()=>{ drawer.classList.remove('open'); document.getElementById("adminPwdErr").hidden=true; document.getElementById("adminPwd").value=""; dlgAdminPwd.showModal(); });
 
@@ -456,10 +525,11 @@ const loginForm = document.getElementById("loginForm");
 const adminPwdForm = document.getElementById("adminPwdForm");
 
 btnLogin.addEventListener("click", ()=>{ document.getElementById("loginErr").hidden=true; dlgLogin.showModal(); });
+document.getElementById('btnLoginClose').addEventListener('click', ()=> dlgLogin.close());
 btnBrowse.addEventListener("click", ()=>{ state.currentUser=null; state.mode="view"; state.adminOverride=false; goBooking(); });
 
 loginForm.addEventListener("submit", async (e)=>{
-  const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
+  e.preventDefault(); // ★オートフィルでも勝手に閉じない
   const name = document.getElementById("loginName").value.trim();
   const pass = document.getElementById("loginPass").value;
   const { data, error } = await sb.from('app_users').select('name, pass').eq('name', name).eq('pass', pass).maybeSingle();
@@ -467,8 +537,9 @@ loginForm.addEventListener("submit", async (e)=>{
   dlgLogin.close(); state.currentUser={name:data.name}; state.mode="edit"; state.adminOverride=false; goBooking();
 });
 
+document.getElementById('btnAdminPwdClose').addEventListener('click', ()=> dlgAdminPwd.close());
 adminPwdForm.addEventListener("submit", (e)=>{
-  const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
+  e.preventDefault();
   const pw = document.getElementById("adminPwd").value;
   if(pw!=="Dynagonazki1012"){ document.getElementById("adminPwdErr").hidden=false; return; }
   dlgAdminPwd.close(); openAdmin();
@@ -734,7 +805,7 @@ async function doPersonal(instAbbr){
   try{
     await insertBooking({ d:state.pending.date, slot:state.pending.slot, type:'personal', label, color:'rgba(255,255,255,.10)', dur:1, owner:name });
     if(dlgPersonal.open) dlgPersonal.close(); if(dlgChoose.open) dlgChoose.close();
-    await refreshBookings(); // ★即時反映（楽観）
+    await refreshBookings();
   }catch(e){ alert(e.message); }
 }
 
@@ -794,7 +865,7 @@ async function doBand(label, dur){
       await insertBooking({ d:date, slot:slot, type:'band', label, color, dur:1, owner:name });
     }
     if(dlgBand.open) dlgBand.close(); if(dlgChoose.open) dlgChoose.close();
-    await refreshBookings(); // ★即時反映（楽観）
+    await refreshBookings();
   }catch(e){ alert(e.message); }
 }
 
@@ -806,7 +877,7 @@ async function onCellMineClick(date, slot){
     const cell = state.bookings[date]?.[slot]; if(!cell) return;
     const owner = state.currentUser?.name; if(!owner) return;
     await deleteCascade(date, slot, owner);
-    await refreshBookings(); // ★即時反映
+    await refreshBookings();
   }, {once:true});
 }
 
@@ -818,7 +889,7 @@ async function onCellAdminClick(date, slot){
     if(cell.dur===2){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]); }
     else if(cell.dur===0){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot-1, slot]); }
     else { await sb.from('bookings').delete().eq('d', date).eq('slot', slot); }
-    await refreshBookings(); // ★即時反映
+    await refreshBookings();
   }, {once:true});
 }
 
@@ -838,7 +909,6 @@ async function isOccupied(d, slot){ const { data } = await sb.from('bookings').s
 // ===== Realtime =====
 let realtimeSub = null;
 function subscribeRealtime(){
-  // 再購読ガード
   if(realtimeSub){ try{ sb.removeChannel(realtimeSub); }catch(_){} realtimeSub=null; }
   realtimeSub = sb.channel('esp-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async ()=>{
@@ -851,7 +921,6 @@ function subscribeRealtime(){
       await loadSettings();
     })
     .subscribe((status)=>{
-      // 接続が落ちた場合に軽く再購読（SDKが自動再接続するが保険）
       if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
         try{ sb.removeChannel(realtimeSub); }catch(_){}
         setTimeout(subscribeRealtime, 800);
@@ -859,9 +928,16 @@ function subscribeRealtime(){
     });
 }
 
-// ===== 0時の自動切替 =====
+// ===== 0時の自動切替＆22:00スナップショット監視 =====
 let midnightTimer=null;
-function startMidnightWatcher(){ if(midnightTimer) clearInterval(midnightTimer); midnightTimer = setInterval(()=>{ const now=new Date(); now.setHours(0,0,0,0); if(now.getTime()!==state.today.getTime()){ buildCalendar(); } }, 120000); }
+function startMidnightWatcher(){
+  if(midnightTimer) clearInterval(midnightTimer);
+  midnightTimer = setInterval(async ()=>{
+    const now=new Date(); now.setHours(0,0,0,0);
+    if(now.getTime()!==state.today.getTime()){ buildCalendar(); }
+    await snapshotWatcherTick(); // 22:00を跨いだら保存
+  }, 60000); // 1分毎
+}
 
 // ===== イベントカレンダー =====
 const calendarEl = document.getElementById('calendar');
@@ -940,13 +1016,68 @@ async function renderHistory(){
 }
 document.getElementById('btnHistoryHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
+// ===== 過去予約（表示） =====
+const archiveGrid = document.getElementById('archiveGrid');
+function renderArchiveGrid(rows){
+  // rows: [{d, data:[slot objects or null]}]
+  // 14日を連番で並べる
+  archiveGrid.innerHTML = '';
+  const end = new Date(); end.setHours(0,0,0,0);
+  const start = addDays(end, -13);
+  const days = []; for(let i=0;i<14;i++){ days.push(addDays(start,i)); }
+
+  // ヘッダ
+  const head = document.createElement("div"); head.className = "header";
+  const timeHead = document.createElement("div"); timeHead.textContent = "時間"; head.appendChild(timeHead);
+  const map = new Map(rows.map(r=>[r.d, r]));
+  days.forEach(d=>{
+    const ds = dateToLocalISO(d);
+    const mdColor = d.getDay()===0 ? '#ef4444' : (d.getDay()===6 ? '#3b82f6' : '#ffffff');
+    const md = `${d.getMonth()+1}/${d.getDate()}(${dayNames[d.getDay()]})`;
+    const dv = document.createElement('div');
+    dv.innerHTML = `<div><div style="font-size:12px;opacity:.95;color:${mdColor}">${md}</div><div style="font-size:10px;opacity:.7">${ds}</div></div>`;
+    head.appendChild(dv);
+  });
+  archiveGrid.appendChild(head);
+
+  // 9-21の12コマ
+  for(let r=0; r<12; r++){
+    const row = document.createElement("div"); row.className = "row-time";
+    const tcell = document.createElement("div"); tcell.className = "timecell";
+    const hour = 9 + r; tcell.textContent = `${hour}:00 - ${hour+1}:00`;
+    row.appendChild(tcell);
+
+    for(const d of days){
+      const ds = dateToLocalISO(d);
+      const snap = map.get(ds);
+      const cell = document.createElement('div'); cell.className='cell';
+      if(snap && Array.isArray(snap.data) && snap.data[r]){
+        const s = snap.data[r];
+        cell.style.background = s.color || "rgba(255,255,255,.08)";
+        if(s.type==='band'){ cell.style.color='#000'; cell.style.textShadow='0 1px 1px rgba(255,255,255,.25)'; }
+        cell.innerHTML = `<div class="badge">${escapeHTML(s.label)}</div>`;
+      }
+      row.appendChild(cell);
+    }
+    archiveGrid.appendChild(row);
+  }
+}
+
 // ===== 初期化 =====
 async function init(){
   setView("home");
   document.getElementById("home").hidden=false;
   initLimitOptions();
+  // スナップショット監視開始
+  startMidnightWatcher();
 }
 init();
+
+// ===== グローバル関数束ね =====
+window.addEventListener('visibilitychange', ()=>{
+  // 22時跨ぎ時の補完に備え、復帰時にもチェック
+  if(document.visibilityState==='visible'){ snapshotWatcherTick(); }
+});
 </script>
 </body>
 </html>
