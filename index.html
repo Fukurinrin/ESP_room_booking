@@ -997,7 +997,6 @@ document.getElementById('btnPrevMonth').addEventListener('click', ()=>{ state.ca
 document.getElementById('btnNextMonth').addEventListener('click', ()=>{ state.calMonth.m++; if(state.calMonth.m>11){ state.calMonth.m=0; state.calMonth.y++; } renderCalendar(); });
 document.getElementById('btnThisMonth').addEventListener('click', ()=>{ const t=new Date(); state.calMonth={y:t.getFullYear(), m:t.getMonth()}; renderCalendar(); });
 document.getElementById('btnEventsHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
-document.getElementById('btnArchiveHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); 
   
 // ===== 履歴 =====
 function openHistory(){ setView('history'); renderHistory(); }
