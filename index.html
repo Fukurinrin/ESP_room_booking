@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ESP部室予約 v3.1</title>
+<title>ESP部室予約 v3.2</title>
 <style>
   :root{
     --glass: rgba(255,255,255,.12);
@@ -32,16 +32,28 @@
     overflow:hidden;
   }
   .bg{ position:fixed; inset:0; background:url("BG.jpg") center/cover no-repeat fixed; filter:saturate(1.05) brightness(.85); z-index:-2; }
-  .bg::after{ content:""; position:absolute; inset:0; backdrop-filter: blur(2px); background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55)); }
+  .bg::after{ content:""; position:absolute; inset:0; backdrop-filter: blur(2px); background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.75)); }
+  /* 画面切替フェード */
+  #xfade{ position:fixed; inset:0; pointer-events:none; background:#000; opacity:0; transition:opacity .18s ease; z-index:25; }
+  #xfade.on{ opacity:.35; }
+
   .center-wrap{ width:min(100%,720px); padding:28px; display:flex; flex-direction:column; align-items:center; gap:22px; }
   .title{ font-weight:800; line-height:1.1; text-align:center; color:#fff; text-shadow:0 2px 0 rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.55); letter-spacing:.02em; }
   @media (max-width:480px){ .title{font-size: clamp(28px, 8vw, 40px);} }
   @media (min-width:481px){ .title{font-size: clamp(36px, 4.6vw, 58px);} }
-  .btn-row{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; }
+
+  /* ホームのボタンレイアウト（2列グリッド） */
+  .btn-grid{
+    display:grid; grid-template-columns: 1fr 1fr; gap:14px; width:100%;
+    align-items:center; justify-items:center;
+  }
+  .btn-grid .span2{ grid-column: 1 / span 2; width:100%; }
   .btn{ -webkit-tap-highlight-color:transparent; appearance:none; border:none; cursor:pointer; padding:14px 22px; min-width:140px; font-weight:700; letter-spacing:.04em; color:#0f172a; background:#fff; border-radius:999px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12), 0 10px 20px rgba(0,0,0,.25); transform:translateY(0); transition: transform .08s ease, box-shadow .08s ease, filter .08s ease; user-select:none; }
   .btn:active{ transform:translateY(2px); box-shadow: inset 0 -0px 0 rgba(0,0,0,.08), 0 6px 12px rgba(0,0,0,.22); filter:brightness(.96); }
   .btn.ghost{ background:transparent; color:#fff; border:1px solid var(--border); box-shadow:none; }
   .btn.small{ padding:10px 14px; min-width:unset; font-weight:600 }
+  .btn.wide{ width:100%; justify-self:stretch; }
+
   .card{ width:min(100%,720px); background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; backdrop-filter: blur(10px); }
   .card h2{ margin:6px 0 10px; font-size:20px }
   .row{ display:flex; gap:10px; margin:10px 0; align-items:center }
@@ -52,41 +64,55 @@
   .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px }
   .hint{ font-size:12px; color:#e5e7eb; opacity:.9 }
   .error{ color:#fecaca; font-size:13px; margin-top:4px }
+
   .topbar{ position:fixed; left:8px; right:8px; top:8px; z-index:10; display:flex; gap:8px; align-items:center; justify-content:space-between; }
   .topbar .left, .topbar .right{ display:flex; gap:8px; align-items:center }
-  .tag{ padding:6px 10px; border-radius:999px; background: rgba(0,0,0,.55); border:1px solid var(--border); font-size:12px }
-  .grid-wrap{ position:absolute; inset:60px 8px 8px 8px; background: rgba(0,0,0,.55); border:1px solid var(--border); border-radius:var(--radius); backdrop-filter: blur(6px); overflow:auto; box-shadow:var(--shadow); }
+  .tag{ padding:6px 10px; border-radius:999px; background:var(--glass); border:1px solid var(--border); font-size:12px }
+
+  .grid-wrap{ position:absolute; inset:60px 8px 8px 8px; background:rgba(0,0,0,.55); border:1px solid var(--border); border-radius:var(--radius); backdrop-filter: blur(6px); overflow:auto; box-shadow:var(--shadow); }
   .schedule{ position:relative; min-width: calc(var(--timeW) + 14 * var(--cellW)); }
-  .header{ position:sticky; top:0; display:grid; grid-template-columns: var(--timeW) repeat(14, var(--cellW)); height:var(--headH); z-index:2; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+  .header{ position:sticky; top:0; display:grid; grid-template-columns: var(--timeW) repeat(14, var(--cellW)); height:var(--headH); z-index:2; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
   .header > div{ display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; font-size:13px; padding:6px; border-right:1px solid var(--border); text-shadow: 0 1px 2px rgba(0,0,0,.65); }
   .header > div.today{ background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 999px rgba(255,255,255,.06); }
   .row-time{ display:grid; grid-template-columns: var(--timeW) repeat(14, var(--cellW)); }
   .cell, .timecell{ height:var(--cellH); border-right:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:13px; text-align:center; padding:4px; }
-  .cell{ color:#fff; text-shadow: 0 1px 2px rgba(0,0,0,.75); }
-  .timecell{ position:sticky; left:0; z-index:1; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); font-weight:700; text-shadow: 0 1px 2px rgba(0,0,0,.75); }
+  .cell{ color:#fff; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+  .timecell{ position:sticky; left:0; z-index:1; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); font-weight:700; text-shadow: 0 1px 2px rgba(0,0,0,.75); }
   .cell.empty{ cursor:pointer }
   .cell.mine{ outline:2px dashed rgba(255,255,255,.45); outline-offset:-3px }
   .cell.badge{ font-weight:700; }
   .legend{ display:flex; gap:10px; align-items:center; font-size:12px; opacity:.9 }
   .legend .dot{ width:10px; height:10px; border-radius:3px; background:#fff; display:inline-block; border:1px solid #fff }
-  .events-row .timecell{ background: rgba(0,0,0,.55); }
-  .events-row .cell{ background: rgba(0,0,0,.28); }
+  .events-row .timecell{ background: rgba(0,0,0,.65); }
+  .events-row .cell{ background: rgba(0,0,0,.40); }
+
   dialog{ border:none; border-radius:16px; padding:18px; background:#0b1220; color:#fff; width:min(92vw, 420px); border:1px solid var(--border); box-shadow:var(--shadow); }
   dialog::backdrop{ background: rgba(0,0,0,.55) }
   .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:14px }
   .hr{ height:1px; background:var(--border); margin:10px 0 }
-  @media (max-width:480px){ :root{ --cellW: 120px; --cellH: 56px; --timeW: 86px; } .btn{ min-width:120px } }
+
+  /* 管理パネルはフルスクロール可能に */
+  #adminPanel{ position:fixed; inset:8px; overflow:auto; }
+
+  @media (max-width:480px){
+    :root{ --cellW: 120px; --cellH: 56px; --timeW: 86px; }
+    .btn{ min-width:120px }
+  }
 </style>
 </head>
 <body>
   <div class="bg"></div>
+  <div id="xfade"></div>
 
   <!-- ホーム -->
   <section id="home" class="center-wrap" hidden>
-    <h1 class="title">ESP部室予約</h1>
-    <div class="btn-row">
-      <button class="btn" id="btnLogin">ログイン</button>
-      <button class="btn" id="btnBrowse">閲覧</button>
+    <h1 class="title">ESP部室予約サイト</h1>
+    <div class="btn-grid">
+      <!-- 上段：ログイン（横長・一行） -->
+      <button class="btn wide span2" id="btnLogin">ログイン</button>
+      <!-- 2段目：閲覧（横長・一行） -->
+      <button class="btn wide span2" id="btnBrowse">閲覧</button>
+      <!-- 下段：2列（管理＋イベント / 履歴＋ルール） -->
       <button class="btn" id="btnAdmin">管理</button>
       <button class="btn" id="btnEvents">イベント</button>
       <button class="btn" id="btnHistory">履歴</button>
@@ -135,12 +161,13 @@
   </dialog>
 
   <!-- 管理パネル -->
-  <section id="adminPanel" class="card" hidden style="position:fixed; inset:auto 8px 8px 8px;">
+  <section id="adminPanel" class="card" hidden>
     <h2>管理パネル</h2>
     <div class="btn-row" style="justify-content:flex-start; margin:6px 0 10px">
       <button class="btn small" id="btnAdminNew">新規登録</button>
       <button class="btn small" id="btnAdminList">ユーザー照会</button>
       <button class="btn small" id="btnAdminBoard">予約表管理</button>
+      <button class="btn small" id="btnAdminLimits">制限</button>
       <button class="btn small ghost" id="btnAdminBack">HOME</button>
     </div>
     <!-- 新規登録 -->
@@ -155,6 +182,31 @@
     <!-- ユーザー照会 -->
     <div id="adminList" hidden>
       <div id="userList"></div>
+    </div>
+    <!-- 制限設定 -->
+    <div id="adminLimits" hidden>
+      <div class="card" style="padding:12px">
+        <div class="row"><label>個人1日1時間</label>
+          <label style="flex:1"><input type="checkbox" id="chkPersonalLimit"> ON/OFF</label>
+        </div>
+        <div class="row"><label>バンド1日2時間</label>
+          <label style="flex:1"><input type="checkbox" id="chkBandLimit"> ON/OFF</label>
+        </div>
+        <div class="row"><label>Dr,Key以外の楽器制限</label>
+          <label style="flex:1"><input type="checkbox" id="chkRestrictGtBa"> ON/OFF</label>
+        </div>
+        <div class="row"><label>予約表上のバンド時間制限</label>
+          <select id="selBandTotalLimit">
+            <option value="none">制限なし</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="btnLimitsBack">戻る</button>
+          <button class="btn" id="btnSaveLimits">保存</button>
+        </div>
+        <div class="hint">※「制限なし」の場合でも、日単位の上限は上の設定に従います。</div>
+        <div class="error" id="limitsErr" hidden></div>
+      </div>
     </div>
   </section>
 
@@ -280,6 +332,39 @@ function addDays(date, n){ const d=new Date(date); d.setDate(d.getDate()+n); d.s
 function randomPastel(){ const h=Math.floor(Math.random()*360), s=55+Math.floor(Math.random()*20), l=78+Math.floor(Math.random()*8); return `hsl(${h} ${s}% ${l}%)`; }
 function escapeHTML(s){ return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
+// ===== 設定（制限） =====
+let appSettings = {
+  personalDailyLimitOn: true,
+  bandDailyLimitOn: true,
+  restrictGtBa: false,
+  bandTotalHoursLimit: null // null=制限なし, 数字=上限
+};
+async function loadSettings(){
+  try{
+    const { data, error } = await sb.from('settings').select('key,value').in('key',[
+      'personalDailyLimitOn','bandDailyLimitOn','restrictGtBa','bandTotalHoursLimit'
+    ]);
+    if(error || !data) return;
+    for(const r of data){
+      if(r.key==='bandTotalHoursLimit'){
+        appSettings.bandTotalHoursLimit = (r.value===null || r.value==='none') ? null : Number(r.value);
+      }else{
+        appSettings[r.key] = (r.value==='true' || r.value===true);
+      }
+    }
+  }catch(_){}
+}
+async function saveSettings(){
+  const rows = [
+    { key:'personalDailyLimitOn', value:String(appSettings.personalDailyLimitOn) },
+    { key:'bandDailyLimitOn',     value:String(appSettings.bandDailyLimitOn) },
+    { key:'restrictGtBa',        value:String(appSettings.restrictGtBa) },
+    { key:'bandTotalHoursLimit', value:(appSettings.bandTotalHoursLimit==null?'none':String(appSettings.bandTotalHoursLimit)) }
+  ];
+  const { error } = await sb.from('settings').upsert(rows, { onConflict: 'key' });
+  if(error) throw new Error(error.message);
+}
+
 // ===== 状態 =====
 let state = {
   view: "home",              // home | booking | admin | events | history
@@ -295,13 +380,19 @@ let state = {
   calMonth: null              // {y, m}
 };
 
+// ===== 画面スイッチ（フェード） =====
+const xfade = document.getElementById('xfade');
 function setView(v){
-  state.view = v;
-  document.getElementById("home").hidden = v!=="home";
-  document.getElementById("booking").hidden = v!=="booking";
-  document.getElementById("adminPanel").hidden = v!=="admin";
-  document.getElementById("events").hidden = v!=="events";
-  document.getElementById("history").hidden = v!=="history";
+  xfade.classList.add('on');
+  setTimeout(()=>{
+    state.view = v;
+    document.getElementById("home").hidden = v!=="home";
+    document.getElementById("booking").hidden = v!=="booking";
+    document.getElementById("adminPanel").hidden = v!=="admin";
+    document.getElementById("events").hidden = v!=="events";
+    document.getElementById("history").hidden = v!=="history";
+    setTimeout(()=> xfade.classList.remove('on'), 120);
+  }, 120);
 }
 
 // ===== ホーム =====
@@ -345,18 +436,26 @@ const btnAdminNew = document.getElementById("btnAdminNew");
 const btnAdminList = document.getElementById("btnAdminList");
 const btnAdminBack = document.getElementById("btnAdminBack");
 const btnAdminBoard = document.getElementById("btnAdminBoard");
+const btnAdminLimits = document.getElementById("btnAdminLimits");
 const adminNew = document.getElementById("adminNew");
 const adminList = document.getElementById("adminList");
+const adminLimits = document.getElementById("adminLimits");
 const userList = document.getElementById("userList");
 const regErr = document.getElementById("regErr");
 
 btnAdminNew.addEventListener("click", ()=> showAdminTab("new"));
 btnAdminList.addEventListener("click", ()=> showAdminTab("list"));
+btnAdminLimits.addEventListener("click", ()=> showAdminTab("limits"));
 btnAdminBack.addEventListener("click", ()=> { state.currentUser=null; state.adminOverride=false; setView("home"); });
 btnAdminBoard.addEventListener("click", ()=> { state.mode = "admin"; state.adminOverride=true; state.currentUser = {name:"[管理]"}; goBooking(); });
 
 function openAdmin(){ setView("admin"); showAdminTab("new"); renderUserList(); }
-function showAdminTab(which){ adminNew.hidden = which!=="new"; adminList.hidden = which!=="list"; }
+function showAdminTab(which){
+  adminNew.hidden   = which!=="new";
+  adminList.hidden  = which!=="list";
+  adminLimits.hidden= which!=="limits";
+  if(which==="limits") initLimitsView();
+}
 
 document.getElementById("btnDoRegister").addEventListener("click", async ()=>{
   const name = document.getElementById("regName").value.trim();
@@ -397,6 +496,48 @@ window.deleteUser = async function(nameEnc){
   await renderUserList();
 };
 
+// 制限タブ 初期化＆保存
+const chkPersonalLimit = document.getElementById('chkPersonalLimit');
+const chkBandLimit = document.getElementById('chkBandLimit');
+const chkRestrictGtBa = document.getElementById('chkRestrictGtBa');
+const selBandTotalLimit = document.getElementById('selBandTotalLimit');
+const btnSaveLimits = document.getElementById('btnSaveLimits');
+const btnLimitsBack = document.getElementById('btnLimitsBack');
+const limitsErr = document.getElementById('limitsErr');
+
+function initLimitOptions(){
+  // 既にoption投入済みならスキップ（重複防止）
+  if(selBandTotalLimit.options.length<=1){
+    for(let i=1;i<=27;i++){
+      const o=document.createElement('option'); o.value=String(i); o.textContent=`${i}時間`;
+      selBandTotalLimit.appendChild(o);
+    }
+  }
+}
+async function initLimitsView(){
+  limitsErr.hidden=true; limitsErr.textContent="";
+  initLimitOptions();
+  await loadSettings();
+  chkPersonalLimit.checked = appSettings.personalDailyLimitOn;
+  chkBandLimit.checked     = appSettings.bandDailyLimitOn;
+  chkRestrictGtBa.checked  = appSettings.restrictGtBa;
+  selBandTotalLimit.value  = (appSettings.bandTotalHoursLimit==null)?'none':String(appSettings.bandTotalHoursLimit);
+}
+btnLimitsBack.addEventListener('click', ()=> showAdminTab('new'));
+btnSaveLimits.addEventListener('click', async ()=>{
+  try{
+    appSettings.personalDailyLimitOn = chkPersonalLimit.checked;
+    appSettings.bandDailyLimitOn     = chkBandLimit.checked;
+    appSettings.restrictGtBa         = chkRestrictGtBa.checked;
+    appSettings.bandTotalHoursLimit  = (selBandTotalLimit.value==='none')? null : Number(selBandTotalLimit.value);
+    await saveSettings();
+    showAdminTab('new');
+  }catch(e){
+    limitsErr.textContent = '保存に失敗しました：'+e.message;
+    limitsErr.hidden=false;
+  }
+});
+
 // ===== 予約画面 =====
 const who = document.getElementById("who");
 const modeTag = document.getElementById("modeTag");
@@ -413,21 +554,13 @@ const dlgDelete = document.getElementById("dlgDelete");
 
 btnBackOrLogout.addEventListener("click", ()=>{ state.currentUser=null; state.adminOverride=false; setView("home"); });
 
-function goBooking(){
+async function goBooking(){
+  await loadSettings(); // 制限設定を反映してから
   setView("booking");
   who.textContent = state.currentUser ? `${state.currentUser.name}` : "閲覧";
-
-  // ここで「予約可」を非表示（編集モード）
-  if(state.mode==="view"){
-    modeTag.textContent = "閲覧のみ";
-    modeTag.hidden = false;
-  } else if(state.mode==="admin"){
-    modeTag.textContent = "管理開放";
-    modeTag.hidden = false;
-  } else {
-    modeTag.textContent = "";
-    modeTag.hidden = true; // 編集モードは非表示
-  }
+  if(state.mode==="view"){ modeTag.textContent = "閲覧のみ"; modeTag.hidden=false; }
+  else if(state.mode==="admin"){ modeTag.textContent = "管理開放"; modeTag.hidden=false; }
+  else { modeTag.textContent = ""; modeTag.hidden=true; }
 
   buildCalendar();
   startMidnightWatcher();
@@ -487,6 +620,8 @@ function renderGrid(){
       const slotObj = state.bookings[dISO]?.[r];
       if(slotObj){
         cell.style.background = slotObj.color || "rgba(255,255,255,.08)";
+        // バンド予約は黒文字＆影弱め
+        if(slotObj.type==='band'){ cell.style.color = '#000'; cell.style.textShadow='0 1px 1px rgba(255,255,255,.25)'; }
         cell.innerHTML = `<div class="badge">${escapeHTML(slotObj.label)}</div>`;
         if(state.adminOverride){ cell.addEventListener("click", ()=> onCellAdminClick(dISO, r)); }
         else if(state.currentUser && slotObj.by === state.currentUser.name){
@@ -521,16 +656,13 @@ function renderGrid(){
 function onEmptyCellClick(date, slot){ state.pending={date, slot}; dlgChoose.returnValue=""; dlgChoose.showModal(); dlgChoose.addEventListener("close", ()=>{ const v=dlgChoose.returnValue; if(v==="personal") openPersonalDialog(); else if(v==="band") openBandDialog(); }, {once:true}); }
 
 function openPersonalDialog(){
-  // 初期化
   btnPersonalConfirm.disabled = true;
   [...personalForm.querySelectorAll('input[name="inst"]')].forEach(r=> r.checked=false);
   dlgPersonal.returnValue=""; dlgPersonal.showModal();
-  // ラジオ選択で有効化
   personalForm.addEventListener('change', ()=>{
     const val = personalForm.querySelector('input[name="inst"]:checked');
     btnPersonalConfirm.disabled = !val;
-  }, {once:false});
-  // 送信
+  });
   personalForm.addEventListener('submit', async (e)=>{
     const ret = e.submitter?.value; if(ret!=="ok") return; e.preventDefault();
     const picked = personalForm.querySelector('input[name="inst"]:checked')?.value;
@@ -541,26 +673,61 @@ function openPersonalDialog(){
 
 async function doPersonal(instAbbr){
   const name = state.currentUser?.name || "匿名";
-  if(!state.adminOverride){
+  // 楽器制限：Gt/Ba禁止（Dr/Keyのみ許可）
+  if(appSettings.restrictGtBa && (instAbbr==='Gt' || instAbbr==='Ba')){
+    alert("現在、ギター／ベースの個人予約は制限中です。");
+    return;
+  }
+  if(appSettings.personalDailyLimitOn && !state.adminOverride){
     const used = await countMyHours(state.pending.date, name, 'personal');
     if(used>=1){ alert("個人予約は1日1時間までです。"); return; }
   }
-  const label = `${name} ${instAbbr}`; // 例：山田太郎 Gt
+  const label = `${name} ${instAbbr}`;
   try{
     await insertBooking({ d:state.pending.date, slot:state.pending.slot, type:'personal', label, color:'rgba(255,255,255,.10)', dur:1, owner:name });
     if(dlgPersonal.open) dlgPersonal.close(); if(dlgChoose.open) dlgChoose.close();
   }catch(e){ alert(e.message); }
 }
 
-function openBandDialog(){ bandErr.hidden=true; bandErr.textContent=""; document.getElementById("bandName").value=""; document.getElementById("bandDur").value="1"; dlgBand.returnValue=""; dlgBand.showModal(); bandForm.addEventListener("submit", (e)=>{ const ret=e.submitter?.value; if(ret!=="ok") return; e.preventDefault(); const label=document.getElementById("bandName").value.trim(); const dur=parseInt(document.getElementById("bandDur").value,10); if(!label){ bandErr.textContent="バンド名を入力してください"; bandErr.hidden=false; return; } doBand(label,dur); }, {once:true}); }
+function openBandDialog(){
+  bandErr.hidden=true; bandErr.textContent="";
+  document.getElementById("bandName").value="";
+  document.getElementById("bandDur").value="1";
+  dlgBand.returnValue=""; dlgBand.showModal();
+  bandForm.addEventListener("submit", (e)=>{
+    const ret=e.submitter?.value; if(ret!=="ok") return;
+    e.preventDefault();
+    const label=document.getElementById("bandName").value.trim();
+    const dur=parseInt(document.getElementById("bandDur").value,10);
+    if(!label){ bandErr.textContent="バンド名を入力してください"; bandErr.hidden=false; return; }
+    doBand(label,dur);
+  }, {once:true});
+}
+
+async function sumBandHours(label){
+  const { data, error } = await sb.from('bookings').select('dur').eq('type','band').eq('label', label);
+  if(error || !data) return 0;
+  return data.reduce((s,r)=> s + (r.dur>0 ? r.dur : 0), 0);
+}
 
 async function doBand(label, dur){
   const name = state.currentUser?.name || "匿名";
   const date = state.pending.date; const slot = state.pending.slot;
-  if(!state.adminOverride){
+
+  if(appSettings.bandDailyLimitOn && !state.adminOverride){
     const used = await countMyHours(date, name, 'band');
     if(used>=2){ alert("バンド予約は1日2時間までです。"); return; }
   }
+  // 予約表上のバンド時間総量制限
+  const addHours = (dur===2)?2:1;
+  if(appSettings.bandTotalHoursLimit!=null && !state.adminOverride){
+    const total = await sumBandHours(label);
+    if(total + addHours > appSettings.bandTotalHoursLimit){
+      alert(`このバンドの合計時間が上限（${appSettings.bandTotalHoursLimit}時間）を超えます。`);
+      return;
+    }
+  }
+
   const color = randomPastel();
   try{
     if(dur===2){
@@ -582,9 +749,27 @@ async function doBand(label, dur){
   }catch(e){ alert(e.message); }
 }
 
-async function onCellMineClick(date, slot){ if(!canEdit(date)) return; state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; const cell = state.bookings[date]?.[slot]; if(!cell) return; const owner = state.currentUser?.name; if(!owner) return; await deleteCascade(date, slot, owner); }, {once:true}); }
+async function onCellMineClick(date, slot){
+  if(!canEdit(date)) return;
+  state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal();
+  dlgDelete.addEventListener("close", async ()=>{
+    if(dlgDelete.returnValue!=="ok") return;
+    const cell = state.bookings[date]?.[slot]; if(!cell) return;
+    const owner = state.currentUser?.name; if(!owner) return;
+    await deleteCascade(date, slot, owner);
+  }, {once:true});
+}
 
-async function onCellAdminClick(date, slot){ state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal(); dlgDelete.addEventListener("close", async ()=>{ if(dlgDelete.returnValue!=="ok") return; const cell = state.bookings[date]?.[slot]; if(!cell){ return; } if(cell.dur===2){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]); } else if(cell.dur===0){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot-1, slot]); } else { await sb.from('bookings').delete().eq('d', date).eq('slot', slot); } }, {once:true}); }
+async function onCellAdminClick(date, slot){
+  state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal();
+  dlgDelete.addEventListener("close", async ()=>{
+    if(dlgDelete.returnValue!=="ok") return;
+    const cell = state.bookings[date]?.[slot]; if(!cell){ return; }
+    if(cell.dur===2){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot, slot+1]); }
+    else if(cell.dur===0){ await sb.from('bookings').delete().eq('d', date).in('slot', [slot-1, slot]); }
+    else { await sb.from('bookings').delete().eq('d', date).eq('slot', slot); }
+  }, {once:true});
+}
 
 async function deleteCascade(date, slot, owner){
   const cell = state.bookings[date]?.[slot]; if(!cell) return;
@@ -606,6 +791,7 @@ function subscribeRealtime(){
   realtimeSub = sb.channel('esp-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async ()=>{ const map = await loadBookingsRange(); state.bookings = map; renderGrid(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, async ()=>{ const emap = await loadEventsRange(); state.events = emap; renderGrid(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async ()=>{ await loadSettings(); }) // 設定変更も反映
     .subscribe();
 }
 
@@ -668,11 +854,8 @@ function renderCalendar(){
 }
 
 document.getElementById('btnPrevMonth').addEventListener('click', ()=>{ state.calMonth.m--; if(state.calMonth.m<0){ state.calMonth.m=11; state.calMonth.y--; } renderCalendar(); });
-
 document.getElementById('btnNextMonth').addEventListener('click', ()=>{ state.calMonth.m++; if(state.calMonth.m>11){ state.calMonth.m=0; state.calMonth.y++; } renderCalendar(); });
-
 document.getElementById('btnThisMonth').addEventListener('click', ()=>{ const t=new Date(); state.calMonth={y:t.getFullYear(), m:t.getMonth()}; renderCalendar(); });
-
 document.getElementById('btnEventsHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 履歴 =====
@@ -691,11 +874,14 @@ async function renderHistory(){
   }).join('');
   list.innerHTML = rows || `<div class="hint">まだ履歴がありません。</div>`;
 }
-
 document.getElementById('btnHistoryHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 初期化 =====
-function init(){ setView("home"); document.getElementById("home").hidden=false; }
+async function init(){
+  setView("home");
+  document.getElementById("home").hidden=false;
+  initLimitOptions();
+}
 init();
 </script>
 </body>
