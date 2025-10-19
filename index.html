@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ESP部室予約 v3.4</title>
+<title>ESP部室予約 v3.5</title>
 <style>
   :root{
     --glass: rgba(255,255,255,.12);
@@ -63,9 +63,7 @@
     box-shadow:var(--shadow); cursor:pointer;
   }
   .hamburger .stack{ display:flex; flex-direction:column; gap:4px; align-items:center; }
-  .hamburger .line{
-    width:22px; height:2px; background:#fff; border-radius:2px;
-  }
+  .hamburger .line{ width:22px; height:2px; background:#fff; border-radius:2px; }
 
   /* 右スライドドロワー */
   .drawer{
@@ -161,7 +159,7 @@
     </div>
   </section>
 
-  <!-- ログイン（method="dialog" をやめる：FaceID等で勝手に閉じない） -->
+  <!-- ログイン -->
   <dialog id="dlgLogin">
     <form id="loginForm" autocomplete="on">
       <h2>ログイン</h2>
@@ -176,7 +174,7 @@
     </form>
   </dialog>
 
-  <!-- 管理パスワード（同上：勝手に閉じない） -->
+  <!-- 管理パスワード -->
   <dialog id="dlgAdminPwd">
     <form id="adminPwdForm" autocomplete="on">
       <h2>管理</h2>
@@ -224,15 +222,9 @@
     <div id="adminList" hidden>
       <div id="userList"></div>
     </div>
-    <!-- 制限設定（既存） -->
+    <!-- 制限設定（①②は削除し、③④のみ表示） -->
     <div id="adminLimits" hidden>
       <div class="card" style="padding:12px">
-        <div class="row"><label>個人1日1時間</label>
-          <label style="flex:1"><input type="checkbox" id="chkPersonalLimit"> ON/OFF</label>
-        </div>
-        <div class="row"><label>バンド1日2時間</label>
-          <label style="flex:1"><input type="checkbox" id="chkBandLimit"> ON/OFF</label>
-        </div>
         <div class="row"><label>Dr,Key以外の楽器制限</label>
           <label style="flex:1"><input type="checkbox" id="chkRestrictGtBa"> ON/OFF</label>
         </div>
@@ -245,7 +237,7 @@
           <button class="btn ghost" id="btnLimitsBack">戻る</button>
           <button class="btn" id="btnSaveLimits">保存</button>
         </div>
-        <div class="hint">※「制限なし」の場合でも、日単位の上限は上の設定に従います。</div>
+        <div class="hint">※「制限なし」の場合でも、日単位（個人1H／バンド2H）は従来ルールのまま適用されます（管理開放は無制限）。</div>
         <div class="error" id="limitsErr" hidden></div>
       </div>
     </div>
@@ -297,7 +289,7 @@
     <div id="historyList" style="margin-top:54px"></div>
   </section>
 
-  <!-- 過去予約（2週間分・閲覧専用） -->
+  <!-- 過去予約 -->
   <section id="archive" hidden>
     <div class="topbar">
       <div class="left">
@@ -371,7 +363,7 @@
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ===== Supabase 接続設定 =====
+// ===== Supabase 接続 =====
 const SUPABASE_URL = "https://qfwkcnkgozipyuhgrieh.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmd2tjbmtnb3ppcHl1aGdyaWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NTQ3MDUsImV4cCI6MjA3NjAzMDcwNX0.zVZOhDPyysOvjNaQs8ZUViKRqALd4zkU2C7169a5P5Q";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -384,32 +376,28 @@ function addDays(date, n){ const d=new Date(date); d.setDate(d.getDate()+n); d.s
 function randomPastel(){ const h=Math.floor(Math.random()*360), s=55+Math.floor(Math.random()*20), l=78+Math.floor(Math.random()*8); return `hsl(${h} ${s}% ${l}%)`; }
 function escapeHTML(s){ return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
-// ===== 設定（制限） =====
+// ===== 設定（①②は撤去。残すのは③④のみ） =====
 let appSettings = {
-  personalDailyLimitOn: true,
-  bandDailyLimitOn: true,
   restrictGtBa: false,
-  bandTotalHoursLimit: null // null=制限なし, 数字=上限
+  bandTotalHoursLimit: null // null=制限なし
 };
 async function loadSettings(){
   try{
     const { data, error } = await sb.from('settings').select('key,value').in('key',[
-      'personalDailyLimitOn','bandDailyLimitOn','restrictGtBa','bandTotalHoursLimit'
+      'restrictGtBa','bandTotalHoursLimit'
     ]);
     if(error || !data) return;
     for(const r of data){
       if(r.key==='bandTotalHoursLimit'){
         appSettings.bandTotalHoursLimit = (r.value===null || r.value==='none') ? null : Number(r.value);
-      }else{
-        appSettings[r.key] = (r.value==='true' || r.value===true);
+      }else if(r.key==='restrictGtBa'){
+        appSettings.restrictGtBa = (r.value==='true' || r.value===true);
       }
     }
   }catch(_){}
 }
 async function saveSettings(){
   const rows = [
-    { key:'personalDailyLimitOn', value:String(appSettings.personalDailyLimitOn) },
-    { key:'bandDailyLimitOn',     value:String(appSettings.bandDailyLimitOn) },
     { key:'restrictGtBa',        value:String(appSettings.restrictGtBa) },
     { key:'bandTotalHoursLimit', value:(appSettings.bandTotalHoursLimit==null?'none':String(appSettings.bandTotalHoursLimit)) }
   ];
@@ -418,70 +406,48 @@ async function saveSettings(){
 }
 
 // ===== スナップショット（22:00保存／過去2週間表示） =====
-const SNAPSHOT_HOUR = 22; // 22:00
+const SNAPSHOT_HOUR = 22;
 async function ensureSnapshotFor(iso){
-  // 既にある？
   const { data:exist } = await sb.from('snapshots').select('d').eq('d', iso).maybeSingle();
   if(exist) return;
-  // その日の全予約を取得
   const { data, error } = await sb.from('bookings').select('*').eq('d', iso);
   if(error) return;
-  // 14スロット分を詰める
-  const slots = Array.from({length:12}, (_,i)=>null); // 9-21 → 12コマ
+  const slots = Array.from({length:12}, (_,i)=>null);
   data.forEach(r=>{
     slots[r.slot] = { type:r.type, label:r.label, color:r.color, by:r.owner, dur:r.dur };
   });
   await sb.from('snapshots').upsert({ d: iso, data: slots }, { onConflict:'d' });
 }
-
-function shouldTakeSnapshotNow(){
-  const now = new Date();
-  return now.getHours() >= SNAPSHOT_HOUR;
-}
-
-async function snapshotWatcherTick(){
-  const todayIso = dateToLocalISO(new Date());
-  if(shouldTakeSnapshotNow()){
-    await ensureSnapshotFor(todayIso);
-  }
-}
-
+function shouldTakeSnapshotNow(){ const now=new Date(); return now.getHours() >= SNAPSHOT_HOUR; }
+async function snapshotWatcherTick(){ const todayIso = dateToLocalISO(new Date()); if(shouldTakeSnapshotNow()) await ensureSnapshotFor(todayIso); }
 async function openArchive(){
   setView('archive');
-  // 未保存なら当日分を補完
   await snapshotWatcherTick();
-  // 2週間分ロード
   const end = new Date(); end.setHours(0,0,0,0);
   const start = addDays(end, -13);
   const startISO = dateToLocalISO(start);
   const endISO   = dateToLocalISO(end);
   const { data } = await sb.from('snapshots').select('*').gte('d', startISO).lte('d', endISO).order('d');
-  // 不足日があれば（過去日でも）一応補完トライ
-  const needMap = new Map();
-  for(let i=0;i<14;i++){ needMap.set(dateToLocalISO(addDays(start,i)), true); }
+  const needMap = new Map(); for(let i=0;i<14;i++){ needMap.set(dateToLocalISO(addDays(start,i)), true); }
   if(data){ for(const r of data){ needMap.delete(r.d); } }
-  for(const iso of needMap.keys()){
-    // 22:00以降で未保存のときのみ補完（当時の状態を完全再現はできないが、残っていれば残存データで）
-    await ensureSnapshotFor(iso);
-  }
-  // 再取得
+  for(const iso of needMap.keys()){ await ensureSnapshotFor(iso); }
   const { data:rows } = await sb.from('snapshots').select('*').gte('d', startISO).lte('d', endISO).order('d');
   renderArchiveGrid(rows || []);
 }
 
 // ===== 状態 =====
 let state = {
-  view: "home",              // home | booking | admin | events | history | archive
-  currentUser: null,          // {name}
+  view: "home",
+  currentUser: null,
   mode: "view",               // view | edit | admin
-  adminOverride: false,       // 予約表管理からの開放フラグ
+  adminOverride: false,
   pending: null,              // {date, slot}
   today: new Date(),
-  days: [],                   // 14 days from today
-  times: [],                  // 9-21 hourly
-  bookings: {},               // { dateISO: { slotIdx: {...} } }
-  events: {},                 // { dateISO: text }
-  calMonth: null              // {y, m}
+  days: [],
+  times: [],
+  bookings: {},
+  events: {},
+  calMonth: null
 };
 
 // ===== 画面スイッチ（フェード） =====
@@ -520,7 +486,6 @@ const btnLogin = document.getElementById("btnLogin");
 const btnBrowse = document.getElementById("btnBrowse");
 const dlgLogin = document.getElementById("dlgLogin");
 const dlgAdminPwd = document.getElementById("dlgAdminPwd");
-const dlgRules = document.getElementById("dlgRules");
 const loginForm = document.getElementById("loginForm");
 const adminPwdForm = document.getElementById("adminPwdForm");
 
@@ -529,7 +494,7 @@ document.getElementById('btnLoginClose').addEventListener('click', ()=> dlgLogin
 btnBrowse.addEventListener("click", ()=>{ state.currentUser=null; state.mode="view"; state.adminOverride=false; goBooking(); });
 
 loginForm.addEventListener("submit", async (e)=>{
-  e.preventDefault(); // ★オートフィルでも勝手に閉じない
+  e.preventDefault();
   const name = document.getElementById("loginName").value.trim();
   const pass = document.getElementById("loginPass").value;
   const { data, error } = await sb.from('app_users').select('name, pass').eq('name', name).eq('pass', pass).maybeSingle();
@@ -601,7 +566,6 @@ async function renderUserList(){
       <div class="actions"><button class="btn small" onclick="deleteUser('${encodeURIComponent(u.name)}')">削除</button></div>
     </div>`).join("");
 }
-
 window.deleteUser = async function(nameEnc){
   const name = decodeURIComponent(nameEnc);
   if(!confirm(`ユーザー「${name}」を削除しますか？`)) return;
@@ -610,9 +574,7 @@ window.deleteUser = async function(nameEnc){
   await renderUserList();
 };
 
-// 制限タブ 初期化＆保存
-const chkPersonalLimit = document.getElementById('chkPersonalLimit');
-const chkBandLimit = document.getElementById('chkBandLimit');
+// 制限タブ（③④のみ）
 const chkRestrictGtBa = document.getElementById('chkRestrictGtBa');
 const selBandTotalLimit = document.getElementById('selBandTotalLimit');
 const btnSaveLimits = document.getElementById('btnSaveLimits');
@@ -631,16 +593,12 @@ async function initLimitsView(){
   limitsErr.hidden=true; limitsErr.textContent="";
   initLimitOptions();
   await loadSettings();
-  chkPersonalLimit.checked = appSettings.personalDailyLimitOn;
-  chkBandLimit.checked     = appSettings.bandDailyLimitOn;
   chkRestrictGtBa.checked  = appSettings.restrictGtBa;
   selBandTotalLimit.value  = (appSettings.bandTotalHoursLimit==null)?'none':String(appSettings.bandTotalHoursLimit);
 }
 btnLimitsBack.addEventListener('click', ()=> showAdminTab('new'));
 btnSaveLimits.addEventListener('click', async ()=>{
   try{
-    appSettings.personalDailyLimitOn = chkPersonalLimit.checked;
-    appSettings.bandDailyLimitOn     = chkBandLimit.checked;
     appSettings.restrictGtBa         = chkRestrictGtBa.checked;
     appSettings.bandTotalHoursLimit  = (selBandTotalLimit.value==='none')? null : Number(selBandTotalLimit.value);
     await saveSettings();
@@ -695,7 +653,6 @@ async function loadBookingsRange(){
   const map={}; for(const r of data){ map[r.d] = map[r.d] || {}; map[r.d][r.slot] = { by:r.owner, type:r.type, label:r.label, color:r.color, dur:r.dur }; }
   return map;
 }
-
 async function loadEventsRange(){
   const startISO = dateToLocalISO(state.days[0]);
   const endISO = dateToLocalISO(state.days[state.days.length-1]);
@@ -703,13 +660,7 @@ async function loadEventsRange(){
   if(error){ console.warn('events load', error.message); return {}; }
   const map={}; for(const r of data){ map[r.d]=r.text||""; } return map;
 }
-
-// 楽観更新用の共通再描画
-async function refreshBookings(){
-  const map = await loadBookingsRange();
-  state.bookings = map;
-  renderGrid();
-}
+async function refreshBookings(){ const map = await loadBookingsRange(); state.bookings = map; renderGrid(); }
 
 function isPast(iso){ const d=new Date(iso); return d < state.today; }
 function canEdit(iso){ return state.adminOverride || !isPast(iso); }
@@ -740,7 +691,6 @@ function renderGrid(){
       const slotObj = state.bookings[dISO]?.[r];
       if(slotObj){
         cell.style.background = slotObj.color || "rgba(255,255,255,.08)";
-        // バンド予約は黒文字
         if(slotObj.type==='band'){ cell.style.color = '#000'; cell.style.textShadow='0 1px 1px rgba(255,255,255,.25)'; }
         cell.innerHTML = `<div class="badge">${escapeHTML(slotObj.label)}</div>`;
         if(state.adminOverride){ cell.addEventListener("click", ()=> onCellAdminClick(dISO, r)); }
@@ -773,7 +723,16 @@ function renderGrid(){
   grid.appendChild(erow);
 }
 
-function onEmptyCellClick(date, slot){ state.pending={date, slot}; dlgChoose.returnValue=""; dlgChoose.showModal(); dlgChoose.addEventListener("close", ()=>{ const v=dlgChoose.returnValue; if(v==="personal") openPersonalDialog(); else if(v==="band") openBandDialog(); }, {once:true}); }
+function onEmptyCellClick(date, slot){
+  state.pending={date, slot};
+  dlgChoose.returnValue="";
+  dlgChoose.showModal();
+  dlgChoose.addEventListener("close", ()=>{
+    const v=dlgChoose.returnValue;
+    if(v==="personal") openPersonalDialog();
+    else if(v==="band") openBandDialog();
+  }, {once:true});
+}
 
 function openPersonalDialog(){
   btnPersonalConfirm.disabled = true;
@@ -797,7 +756,8 @@ async function doPersonal(instAbbr){
     alert("現在、ギター／ベースの個人予約は制限中です。");
     return;
   }
-  if(appSettings.personalDailyLimitOn && !state.adminOverride){
+  // ① UIは削除したが、既定ルール（1日1H）は維持。管理開放時は無制限。
+  if(!state.adminOverride){
     const used = await countMyHours(state.pending.date, name, 'personal');
     if(used>=1){ alert("個人予約は1日1時間までです。"); return; }
   }
@@ -834,10 +794,14 @@ async function doBand(label, dur){
   const name = state.currentUser?.name || "匿名";
   const date = state.pending.date; const slot = state.pending.slot;
 
-  if(appSettings.bandDailyLimitOn && !state.adminOverride){
+  // ② UIは削除したが、既定ルール（1日2H）は維持。管理開放時は無制限。
+  if(!state.adminOverride){
     const used = await countMyHours(date, name, 'band');
-    if(used>=2){ alert("バンド予約は1日2時間までです。"); return; }
+    const addHours = (dur===2)?2:1;
+    if(used + addHours > 2){ alert("バンド予約は1日2時間までです。"); return; }
   }
+
+  // ④ 合計時間上限
   const addHours = (dur===2)?2:1;
   if(appSettings.bandTotalHoursLimit!=null && !state.adminOverride){
     const total = await sumBandHours(label);
@@ -880,7 +844,6 @@ async function onCellMineClick(date, slot){
     await refreshBookings();
   }, {once:true});
 }
-
 async function onCellAdminClick(date, slot){
   state.pending={date,slot}; dlgDelete.returnValue=""; dlgDelete.showModal();
   dlgDelete.addEventListener("close", async ()=>{
@@ -935,8 +898,8 @@ function startMidnightWatcher(){
   midnightTimer = setInterval(async ()=>{
     const now=new Date(); now.setHours(0,0,0,0);
     if(now.getTime()!==state.today.getTime()){ buildCalendar(); }
-    await snapshotWatcherTick(); // 22:00を跨いだら保存
-  }, 60000); // 1分毎
+    await snapshotWatcherTick();
+  }, 60000);
 }
 
 // ===== イベントカレンダー =====
@@ -950,10 +913,9 @@ const eventDateLabel = document.getElementById('eventDateLabel');
 function openEvents(){
   setView('events');
   const today = new Date();
-  state.calMonth = { y: today.getFullYear(), m: today.getMonth() }; // 0-based
+  state.calMonth = { y: today.getFullYear(), m: today.getMonth() };
   renderCalendar();
 }
-
 function renderCalendar(){
   const y = state.calMonth.y, m = state.calMonth.m;
   const first = new Date(y, m, 1); const firstDow = first.getDay();
@@ -992,12 +954,11 @@ function renderCalendar(){
     calendarEl.appendChild(cell);
   }
 }
-
 document.getElementById('btnPrevMonth').addEventListener('click', ()=>{ state.calMonth.m--; if(state.calMonth.m<0){ state.calMonth.m=11; state.calMonth.y--; } renderCalendar(); });
 document.getElementById('btnNextMonth').addEventListener('click', ()=>{ state.calMonth.m++; if(state.calMonth.m>11){ state.calMonth.m=0; state.calMonth.y++; } renderCalendar(); });
 document.getElementById('btnThisMonth').addEventListener('click', ()=>{ const t=new Date(); state.calMonth={y:t.getFullYear(), m:t.getMonth()}; renderCalendar(); });
 document.getElementById('btnEventsHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
-  
+
 // ===== 履歴 =====
 function openHistory(){ setView('history'); renderHistory(); }
 async function renderHistory(){
@@ -1019,14 +980,11 @@ document.getElementById('btnHistoryHome').addEventListener('click', ()=> { state
 // ===== 過去予約（表示） =====
 const archiveGrid = document.getElementById('archiveGrid');
 function renderArchiveGrid(rows){
-  // rows: [{d, data:[slot objects or null]}]
-  // 14日を連番で並べる
   archiveGrid.innerHTML = '';
   const end = new Date(); end.setHours(0,0,0,0);
   const start = addDays(end, -13);
   const days = []; for(let i=0;i<14;i++){ days.push(addDays(start,i)); }
 
-  // ヘッダ
   const head = document.createElement("div"); head.className = "header";
   const timeHead = document.createElement("div"); timeHead.textContent = "時間"; head.appendChild(timeHead);
   const map = new Map(rows.map(r=>[r.d, r]));
@@ -1040,7 +998,6 @@ function renderArchiveGrid(rows){
   });
   archiveGrid.appendChild(head);
 
-  // 9-21の12コマ
   for(let r=0; r<12; r++){
     const row = document.createElement("div"); row.className = "row-time";
     const tcell = document.createElement("div"); tcell.className = "timecell";
@@ -1062,20 +1019,19 @@ function renderArchiveGrid(rows){
     archiveGrid.appendChild(row);
   }
 }
+document.getElementById('btnArchiveHome').addEventListener('click', ()=> { state.currentUser=null; state.adminOverride=false; setView('home'); });
 
 // ===== 初期化 =====
 async function init(){
   setView("home");
   document.getElementById("home").hidden=false;
   initLimitOptions();
-  // スナップショット監視開始
   startMidnightWatcher();
 }
 init();
 
-// ===== グローバル関数束ね =====
+// ===== Realtime 保険 =====
 window.addEventListener('visibilitychange', ()=>{
-  // 22時跨ぎ時の補完に備え、復帰時にもチェック
   if(document.visibilityState==='visible'){ snapshotWatcherTick(); }
 });
 </script>
