@@ -910,12 +910,33 @@ const eventForm = document.getElementById('eventForm');
 const eventTextEl = document.getElementById('eventText');
 const eventDateLabel = document.getElementById('eventDateLabel');
 
-function openEvents(){
+async function loadEventsMonth(y, m){
+  const startISO = dateToLocalISO(new Date(y, m, 1));
+  const endISO   = dateToLocalISO(new Date(y, m + 1, 0));
+  const { data, error } = await sb
+    .from('events')
+    .select('d, text')
+    .gte('d', startISO)
+    .lte('d', endISO);
+
+  if(error){
+    console.warn('events month load', error.message);
+    return;
+  }
+  for(const r of (data || [])){
+    state.events[r.d] = r.text || "";
+  }
+}
+
+async function openEvents(){
   setView('events');
   const today = new Date();
   state.calMonth = { y: today.getFullYear(), m: today.getMonth() };
+
+  await loadEventsMonth(state.calMonth.y, state.calMonth.m);
   renderCalendar();
 }
+
 function renderCalendar(){
   const y = state.calMonth.y, m = state.calMonth.m;
   const first = new Date(y, m, 1); const firstDow = first.getDay();
